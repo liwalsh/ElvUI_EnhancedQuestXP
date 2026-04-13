@@ -3,7 +3,6 @@ local EQX = E:GetModule("EnhancedQuestXP")
 
 EQX.Detection.Cache = {
     serverMultiplier = nil,
-    premiumBonus = 0,
     christmasBonus = 0,
     potionBonus = 0,
     familyBonus = 0,
@@ -19,21 +18,6 @@ function EQX.Detection:DetectServerMultiplier()
     self.Cache.serverMultiplier = EQX.Utils:ParseServerMultiplier()
     EQX.Utils:Debug("Server multiplier detected:", self.Cache.serverMultiplier)
     return self.Cache.serverMultiplier
-end
-
-function EQX.Detection:DetectPremiumBonus()
-    local buffId = EQX.Constants.Buffs.Premium
-    local hasDebuff, debuffIndex = EQX.Utils:HasDebuffById("player", buffId)
-
-    if hasDebuff then
-        local percent = EQX.Utils:ParseDebuffPercentage("player", debuffIndex)
-        self.Cache.premiumBonus = percent
-        EQX.Utils:Debug("Premium buff detected:", percent .. "%")
-        return percent
-    end
-
-    self.Cache.premiumBonus = 0
-    return 0
 end
 
 function EQX.Detection:DetectChristmasBonus()
@@ -66,14 +50,14 @@ function EQX.Detection:DetectPotionBonus()
 end
 
 function EQX.Detection:DetectFamilyItems()
-    local totalBonus = 0
+    local totalBonus = 1
     local itemCount = 0
 
     for _, slot in ipairs(EQX.Constants.EquipmentSlots) do
         local itemId = EQX.Utils:GetEquippedItemId(slot)
         if itemId and EQX.Constants.FamilyItems[itemId] then
             local bonus = EQX.Constants.FamilyItems[itemId]
-            totalBonus = totalBonus + bonus
+            totalBonus = totalBonus * (1 + bonus/100)
             itemCount = itemCount + 1
             EQX.Utils:Debug("Family item found in slot", slot, ":", itemId, "+", bonus .. "%")
         end
@@ -92,7 +76,6 @@ function EQX.Detection:UpdateAll()
     end
     self.Cache.lastUpdate = now
 
-    self:DetectPremiumBonus()
     self:DetectChristmasBonus()
     self:DetectPotionBonus()
     self:DetectFamilyItems()
@@ -103,14 +86,12 @@ function EQX.Detection:GetBonuses()
 
     local serverMult = db.serverMultiplierAuto and self:DetectServerMultiplier() or db.serverMultiplier
 
-    local premiumBonus = 0
     local christmasBonus = 0
     local potionBonus = 0
     local familyBonus = 0
     local familyCount = 0
 
     if db.bonusTrackingEnabled then
-        premiumBonus = self.Cache.premiumBonus
         christmasBonus = self.Cache.christmasBonus
         potionBonus = self.Cache.potionBonus
         familyBonus = self.Cache.familyBonus
@@ -119,7 +100,6 @@ function EQX.Detection:GetBonuses()
 
     return {
         serverMultiplier = serverMult,
-        premiumBonus = premiumBonus,
         christmasBonus = christmasBonus,
         potionBonus = potionBonus,
         familyBonus = familyBonus,
@@ -133,9 +113,6 @@ function EQX.Detection:GetStatusText()
 
     table.insert(parts, format("x%d", bonuses.serverMultiplier))
 
-    if bonuses.premiumBonus > 0 then
-        table.insert(parts, format(L["STATUS_PREMIUM"], bonuses.premiumBonus))
-    end
     if bonuses.christmasBonus > 0 then
         table.insert(parts, format(L["STATUS_CHRISTMAS"], bonuses.christmasBonus))
     end
